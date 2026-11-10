@@ -79,6 +79,16 @@
   .supplier-offer-row{flex-wrap:wrap}
   .supplier-offer-actions{width:100%;justify-content:flex-end}
   #panel-fornecedores .section-head>.top-actions .btn{white-space:normal;line-height:1.15}
+}/* Cartão de produto compacto para celular */
+@media(max-width:600px){
+  .table-wrap tbody tr{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-content:start;gap:7px 12px;padding:12px 14px}
+  .table-wrap tbody td:first-child{grid-column:1/-1}
+  .table-wrap tbody td:nth-child(2){grid-column:1/-1;align-self:center}
+  .table-wrap tbody td:nth-child(3){grid-column:1/-1}
+  .table-wrap tbody td:nth-child(4){grid-column:1;align-self:start}
+  .table-wrap tbody td:nth-child(5){grid-column:2;align-self:start}
+  .table-wrap tbody td:nth-child(6){grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:1px;padding-top:8px;border-top:1px solid var(--line)}
+  .table-wrap tbody td:nth-child(6)::before{margin:0;font-size:10px}
 }</style></head><body>
 <div class="app">
 <header class="top"><div class="brand"><div class="logo">▤</div><div><strong>Meu estoque</strong><small>Controle simples de materiais</small></div></div><div class="top-actions"><button class="btn" aria-label="Importar CSV" onclick="openCsvPicker()">&#8679; <span class="label">Importar CSV</span></button><input id="csvImportInput" type="file" accept=".csv,text/csv" multiple hidden onchange="importCSVFiles(this.files,this)"><button class="btn" onclick="exportCSV()">⇩ <span class="label">Backup CSV</span></button><button class="btn primary" onclick="openProduct()">＋ <span class="label">Novo produto</span></button></div></header>
