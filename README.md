@@ -1,37 +1,35 @@
 # Estoque Geral
 
-Sistema web simples para organizar produtos do estoque e do almoxarifado, fornecedores e preços de compra.
+Sistema web simples para organizar estoque, almoxarifado, fornecedores e movimentações.
 
 ## Funcionalidades
 
-- Cadastro de produtos com código automático, quantidade, unidade, peso, preços, validade e fornecedor do lote.
-- Cálculo da data de vencimento a partir da data de entrada e da validade em dias.
-- Cadastro de mais de um fornecedor e preço por produto, para comparar opções de compra.
-- Organização por departamento, seção e categoria, com opções separadas para Estoque e Almoxarifado.
-- Cadastro de fornecedores com código automático no padrão `F001`.
-- Busca e filtros para produtos e fornecedores, além de relatórios filtráveis.
-- Exportação e importação de backups CSV. A importação acrescenta registros que ainda não existem e ignora duplicatas.
-- Interface adaptada para celular. Os painéis de filtros podem ser recolhidos em **+ Filtros**.
+- Produtos e lotes com fornecedor, quantidade, preço, validade e classificação.
+- Lotes com saldo podem ser mesclados quando produto, classificação, unidade, peso, fornecedor, preço e vencimento coincidirem. O saldo é somado ao lote escolhido, e o lote de origem é arquivado com o histórico preservado.
+- Lotes sem saldo podem ser arquivados e restaurados. Os filtros de Estoque e Almoxarifado permitem visualizar ativos, arquivados ou todos.
+- Entradas somam a quantidade do lote quando fornecedor, preço e vencimento coincidem; diferenças criam outro lote. Saídas para produção descontam do lote escolhido e atualizam o saldo.
+- Filtros por área, fornecedor, departamento, seção e categoria.
+- Relatórios exportáveis em Excel (`.xlsx`) e PDF.
+- Backup e restauração de produtos, fornecedores e movimentações em CSV; o backup de produtos também preserva o status de arquivamento.
+- Interface adaptada para celular, com abas principais e menu **Mais**. A aba **Sobre** reúne aviso de direitos autorais, termos de uso e política de privacidade.
 
 ## Publicar no GitHub Pages
 
 1. Coloque `index.html` na raiz do repositório.
-2. No GitHub, abra **Settings > Pages**.
-3. Em **Build and deployment**, selecione **Deploy from a branch**.
-4. Escolha a branch `main` e a pasta `/(root)`, depois clique em **Save**.
-5. Aguarde a publicação. Para este repositório, o endereço é [https://paulovictrr.github.io/EstoqueGeral/](https://paulovictrr.github.io/EstoqueGeral/).
+2. Em **Settings > Pages**, selecione **Deploy from a branch**.
+3. Escolha a branch `main` e a pasta `/(root)`, depois clique em **Save**.
+4. O endereço deste repositório é [https://paulovictrr.github.io/EstoqueGeral/](https://paulovictrr.github.io/EstoqueGeral/).
 
-Quando atualizar o sistema, substitua o `index.html` pela versão nova e faça commit no GitHub. O Pages mantém o mesmo endereço.
+Para atualizar, substitua o `index.html` pela versão nova e faça commit. O endereço do Pages permanece igual.
 
-## Backup e restauração
+## Backups e relatórios
 
-- Use **Backup CSV** para exportar os arquivos de produtos e fornecedores.
-- Na aba **Fornecedores**, também é possível exportar somente os fornecedores.
-- Use **Importar CSV** e selecione os arquivos de backup. Para restaurar um backup completo, selecione os CSVs de produtos e fornecedores juntos.
-- A importação acrescenta os registros que não encontrar no sistema e evita duplicar produtos pelo código.
+- **Backup CSV** baixa arquivos de produtos, fornecedores e movimentações, com UTF-8 e separador adequado ao Excel em português. Selecione esses CSVs juntos em **Importar CSV** para restaurar.
+- Na aba **Relatórios**, filtre por área, departamento, seção, categoria e fornecedor, e escolha **Excel (.xlsx)** ou **PDF**. Na aba **Fornecedores**, gere relatórios PDF/Excel com os filtros de fornecedores aplicados.
+- O PDF abre a tela de impressão do navegador; escolha **Salvar como PDF**.
+- A exportação Excel carrega a biblioteca xlsx-js-style da internet para aplicar a formatação visual. Os demais recursos continuam disponíveis mesmo se essa biblioteca não carregar.
 
-## Onde os dados ficam salvos
+## Onde ficam os dados
 
-Os dados ficam no armazenamento local (`localStorage`) do navegador e aparelho usados. O GitHub Pages hospeda os arquivos do sistema, mas não sincroniza os cadastros entre aparelhos ou navegadores. Para levar os dados a outro aparelho, exporte os CSVs no aparelho atual e importe-os no outro.
+Os dados ficam no armazenamento local do navegador e aparelho usados. O GitHub Pages hospeda o sistema, mas não sincroniza os cadastros entre aparelhos. Para transferir dados, exporte os CSVs no aparelho atual e importe-os no outro. Limpar os dados do navegador pode apagar os cadastros locais.
 
-Guarde os CSVs de backup em um local seguro. Limpar os dados do navegador pode apagar os cadastros armazenados naquele aparelho.
