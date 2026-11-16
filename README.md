@@ -13,15 +13,6 @@ Sistema web simples para organizar estoque, almoxarifado, fornecedores e movimen
 - Backup e restauração de produtos, fornecedores e movimentações em CSV; o backup de produtos também preserva o status de arquivamento.
 - Interface adaptada para celular, com abas principais e menu **Mais**. A aba **Sobre** reúne aviso de direitos autorais, termos de uso e política de privacidade.
 
-## Publicar no GitHub Pages
-
-1. Coloque `index.html` na raiz do repositório.
-2. Em **Settings > Pages**, selecione **Deploy from a branch**.
-3. Escolha a branch `main` e a pasta `/(root)`, depois clique em **Save**.
-4. O endereço deste repositório é [https://paulovictrr.github.io/EstoqueGeral/](https://paulovictrr.github.io/EstoqueGeral/).
-
-Para atualizar, substitua o `index.html` pela versão nova e faça commit. O endereço do Pages permanece igual.
-
 ## Backups e relatórios
 
 - **Backup CSV** baixa arquivos de produtos, fornecedores e movimentações, com UTF-8 e separador adequado ao Excel em português. Selecione esses CSVs juntos em **Importar CSV** para restaurar.
