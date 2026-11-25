@@ -39,14 +39,16 @@ function hasLocalRecords() {
 }
 function showCloudAuth(mode = 'login', message = '') {
   const signingUp = mode === 'signup';
-  cloudGate('<div class="eyebrow" style="color:var(--green)">ESTOQUE GERAL · ACESSO COMPARTILHADO</div><h1>' + (signingUp ? 'Criar sua conta' : 'Entrar no sistema') + '</h1><p>Use seu e-mail e senha para acessar os dados da sua empresa em qualquer aparelho.</p><form id="cloudAuthForm" class="form-grid"><label class="form-field"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label><label class="form-field"><span>Senha</span><input name="password" type="password" minlength="8" autocomplete="' + (signingUp ? 'new-password' : 'current-password') + '" required></label><div class="form-foot"><button class="btn primary" type="submit">' + (signingUp ? 'Criar conta' : 'Entrar') + '</button></div></form><p class="cloud-message" id="cloudMessage">' + esc(message || (signingUp ? 'Use uma senha com pelo menos 8 caracteres.' : '')) + '</p><button class="btn subtle" id="cloudAuthToggle" type="button">' + (signingUp ? 'Já tenho conta · Entrar' : 'Primeiro acesso · Criar conta') + '</button>');
+  const nameFields = signingUp ? '<label class="form-field"><span>Primeiro nome</span><input name="firstName" autocomplete="given-name" required></label><label class="form-field"><span>Segundo nome</span><input name="lastName" autocomplete="family-name" required></label>' : '';
+  cloudGate('<div class="eyebrow" style="color:var(--green)">ESTOQUE GERAL · ACESSO COMPARTILHADO</div><h1>' + (signingUp ? 'Criar sua conta' : 'Entrar no sistema') + '</h1><p>Entre com sua conta e depois escolha a empresa que deseja acessar.</p><form id="cloudAuthForm" class="form-grid">' + nameFields + '<label class="form-field"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label><label class="form-field"><span>Senha</span><input name="password" type="password" minlength="8" autocomplete="' + (signingUp ? 'new-password' : 'current-password') + '" required></label><div class="form-foot"><button class="btn primary" type="submit">' + (signingUp ? 'Criar conta' : 'Entrar') + '</button></div></form><p class="cloud-message" id="cloudMessage">' + esc(message || (signingUp ? 'Use uma senha com pelo menos 8 caracteres.' : '')) + '</p><button class="btn subtle" id="cloudAuthToggle" type="button">' + (signingUp ? 'Já tenho conta · Entrar' : 'Primeiro acesso · Criar conta') + '</button>');
   document.getElementById('cloudAuthForm').addEventListener('submit', async event => {
     event.preventDefault();
     const form = new FormData(event.currentTarget), email = String(form.get('email') || '').trim(), password = String(form.get('password') || ''), submit = event.currentTarget.querySelector('[type="submit"]');
     submit.disabled = true; cloudMessage('Conectando…');
     try {
       if (signingUp) {
-        const { data: result, error } = await cloudClient.auth.signUp({ email, password, options: { emailRedirectTo: location.href.split('#')[0] } });
+        const firstName = String(form.get('firstName') || '').trim(), lastName = String(form.get('lastName') || '').trim();
+        const { data: result, error } = await cloudClient.auth.signUp({ email, password, options: { emailRedirectTo: location.href.split('#')[0], data: { first_name: firstName, last_name: lastName, full_name: firstName + ' ' + lastName } } });
         if (error) throw error;
         if (!result.session) { showCloudAuth('login', 'Conta criada. Confirme o link enviado ao seu e-mail e depois entre aqui.'); return; }
         cloudUser = result.user; await cloudLoadCompanies();
@@ -63,33 +65,46 @@ async function cloudLoadCompanies() {
   const { data: memberships, error } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
   if (error) { showCloudAuth('login', cloudError(error)); return; }
   cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || 'Empresa' }));
-  if (cloudCompanies.length === 1) return cloudSelectCompany(cloudCompanies[0].id);
-  if (cloudCompanies.length > 1) return cloudShowCompanyPicker();
-  cloudShowCreateCompany();
+  if (cloudCompanies.length) return cloudShowCompanyPicker();
+  cloudShowJoinCompany();
 }
 function cloudShowCompanyPicker() {
   const buttons = cloudCompanies.map(company => '<button class="btn" type="button" data-company="' + esc(company.id) + '">' + esc(company.name) + '<small style="display:block;color:var(--muted)">' + esc(company.role) + '</small></button>').join('');
-  cloudGate('<div class="eyebrow" style="color:var(--green)">ACESSO COMPARTILHADO</div><h1>Escolha a empresa</h1><p>Conta: ' + esc(cloudUser.email) + '</p><div class="cloud-company-list">' + buttons + '</div><p class="cloud-message" id="cloudMessage"></p><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
+  cloudGate('<div class="eyebrow" style="color:var(--green)">ACESSO COMPARTILHADO</div><h1>Escolha a empresa</h1><p>Conta: ' + esc(cloudUser.email) + '</p><div class="cloud-company-list">' + buttons + '</div><p class="cloud-message" id="cloudMessage"></p><div class="form-foot"><button class="btn" type="button" onclick="cloudShowJoinCompany()">Entrar em outra empresa</button><button class="btn" type="button" onclick="cloudShowCreateCompany()">Criar empresa</button></div><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
   document.querySelectorAll('[data-company]').forEach(button => button.addEventListener('click', () => cloudSelectCompany(button.dataset.company)));
+}
+function cloudShowJoinCompany(message = '') {
+  cloudGate('<div class="eyebrow" style="color:var(--green)">ENTRAR EM UMA EMPRESA</div><h1>Nome e senha da empresa</h1><p>Peça esses dados ao responsável pela empresa. Você também precisa estar conectado à sua conta pessoal.</p><form id="cloudJoinForm" class="form-grid"><label class="form-field"><span>Empresa</span><input name="companyName" required minlength="2" autocomplete="organization" placeholder="Nome da empresa"></label><label class="form-field"><span>Senha de acesso da empresa</span><input name="companyPassword" type="password" required minlength="8" autocomplete="off"></label><div class="form-foot"><button class="btn primary" type="submit">Entrar na empresa</button></div></form><p class="cloud-message" id="cloudMessage">' + esc(message) + '</p><div class="form-foot"><button class="btn" type="button" onclick="cloudShowCreateCompany()">Criar uma nova empresa</button>' + (cloudCompanies.length ? '<button class="btn subtle" type="button" onclick="cloudShowCompanyPicker()">Voltar às empresas</button>' : '') + '</div><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
+  document.getElementById('cloudJoinForm').addEventListener('submit', async event => {
+    event.preventDefault(); const fields = new FormData(event.currentTarget), submit = event.currentTarget.querySelector('[type="submit"]'); submit.disabled = true; cloudMessage('Verificando acesso…');
+    try {
+      const { data: companyId, error } = await cloudClient.rpc('join_company_by_password', { p_company_name: String(fields.get('companyName')).trim(), p_password: String(fields.get('companyPassword')) });
+      if (error) throw error;
+      const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
+      if (membershipError) throw membershipError;
+      cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || 'Empresa' }));
+      if (!cloudCompanies.some(company => company.id === companyId)) throw new Error('Não foi possível confirmar o vínculo. Tente entrar novamente.');
+      cloudShowCompanyPicker();
+    } catch (error) { cloudMessage(cloudError(error), true); submit.disabled = false; }
+  });
 }
 function cloudShowCreateCompany() {
   const importAvailable = hasLocalRecords();
-  cloudGate('<div class="eyebrow" style="color:var(--green)">PRIMEIRO ACESSO</div><h1>Criar uma empresa</h1><p>Conta: ' + esc(cloudUser.email) + '</p><form id="cloudCreateForm" class="form-grid"><label class="form-field"><span>Nome da empresa</span><input name="name" required minlength="2" maxlength="120" value="Shalon" placeholder="Ex.: Shalon"></label>' + (importAvailable ? '<label class="cloud-check"><input type="checkbox" name="importLocal" checked><span>Importar para esta empresa os dados encontrados neste aparelho (' + esc(String((data.products || []).length)) + ' produtos e registros relacionados).</span></label>' : '') + '<div class="form-foot"><button class="btn primary" type="submit">Criar empresa</button></div></form><p class="cloud-message" id="cloudMessage">A conta será a proprietária da empresa.</p><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
+  cloudGate('<div class="eyebrow" style="color:var(--green)">NOVA EMPRESA</div><h1>Criar uma empresa</h1><p>Conta: ' + esc(cloudUser.email) + '</p><form id="cloudCreateForm" class="form-grid"><label class="form-field"><span>Nome da empresa</span><input name="name" required minlength="2" maxlength="120" value="Shalon" placeholder="Ex.: Shalon"></label><label class="form-field"><span>Senha de acesso para a equipe</span><input name="companyPassword" type="password" required minlength="8" autocomplete="new-password"></label><p class="cloud-message">Compartilhe esta senha apenas com pessoas autorizadas. Cada pessoa também usará seu próprio login.</p>' + (importAvailable ? '<label class="cloud-check"><input type="checkbox" name="importLocal" checked><span>Importar para esta empresa os dados encontrados neste aparelho (' + esc(String((data.products || []).length)) + ' produtos e registros relacionados).</span></label>' : '') + '<div class="form-foot"><button class="btn primary" type="submit">Criar empresa</button></div></form><p class="cloud-message" id="cloudMessage">A conta será a proprietária da empresa.</p><div class="form-foot"><button class="btn subtle" type="button" onclick="cloudShowJoinCompany()">Voltar</button><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button></div>');
   document.getElementById('cloudCreateForm').addEventListener('submit', async event => {
-    event.preventDefault(); const form = new FormData(event.currentTarget), name = String(form.get('name') || '').trim(), importLocal = Boolean(form.get('importLocal'));
+    event.preventDefault(); const form = new FormData(event.currentTarget), name = String(form.get('name') || '').trim(), companyPassword = String(form.get('companyPassword') || ''), importLocal = Boolean(form.get('importLocal'));
     const submit = event.currentTarget.querySelector('[type="submit"]'); submit.disabled = true; cloudMessage('Criando empresa…');
     try {
       let initial = {};
       if (importLocal) { try { initial = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { initial = {}; } }
       const { data: companyId, error } = await cloudClient.rpc('create_company', { p_name: name, p_initial_data: initial });
       if (error) throw error;
-      await cloudLoadCompanies();
-      if (!cloudCompanies.some(company => company.id === companyId)) {
-        const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
-        if (membershipError) throw membershipError;
-        cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || name }));
-        await cloudSelectCompany(companyId);
-      }
+      const { error: passwordError } = await cloudClient.rpc('set_company_access_password', { p_company_id: companyId, p_password: companyPassword });
+      if (passwordError) throw passwordError;
+      const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
+      if (membershipError) throw membershipError;
+      cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || name }));
+      await cloudSelectCompany(companyId);
     } catch (error) { cloudMessage(cloudError(error), true); submit.disabled = false; }
   });
 }
@@ -171,8 +186,10 @@ async function cloudRefreshCompany() {
 function openCloudAccount() {
   const choices = cloudCompanies.map(company => '<button class="btn" type="button" onclick="closeModal();cloudSelectCompany(\'' + esc(company.id) + '\')">Abrir ' + esc(company.name) + '</button>').join('');
   const admin = ['owner','admin'].includes(cloudCtx?.role);
-  document.getElementById('modal').innerHTML = '<div class="modal-head"><div><h3>' + esc(cloudCtx?.name || 'Empresa') + '</h3><small>' + esc(cloudUser?.email || '') + ' · perfil ' + esc(cloudCtx?.role || '') + '</small></div><button class="close" onclick="closeModal()">×</button></div><p>Os dados desta empresa são compartilhados entre seus membros.</p>' + (cloudCompanies.length > 1 ? '<div class="cloud-company-list">' + choices + '</div>' : '') + (admin ? '<h4>Adicionar pessoa à empresa</h4><form id="cloudMemberForm" class="form-grid"><label class="form-field full"><span>E-mail da pessoa (ela precisa criar e confirmar a conta primeiro)</span><input name="email" type="email" required></label><label class="form-field"><span>Acesso</span><select name="role"><option value="member">Membro</option><option value="admin">Administrador</option></select></label><div class="form-foot"><button class="btn primary" type="submit">Adicionar à empresa</button></div></form>' : '') + '<div class="form-foot"><button class="btn danger" onclick="cloudSignOut()">Sair da conta</button><button class="btn" onclick="closeModal()">Fechar</button></div>';
+  document.getElementById('modal').innerHTML = '<div class="modal-head"><div><h3>' + esc(cloudCtx?.name || 'Empresa') + '</h3><small>' + esc(cloudUser?.email || '') + ' · perfil ' + esc(cloudCtx?.role || '') + '</small></div><button class="close" onclick="closeModal()">×</button></div><p>Os dados desta empresa são compartilhados entre seus membros.</p>' + (cloudCompanies.length > 1 ? '<div class="cloud-company-list">' + choices + '</div>' : '') + (admin ? '<h4>Senha de acesso da empresa</h4><form id="cloudAccessPasswordForm" class="form-grid"><label class="form-field full"><span>Defina ou troque a senha que os membros usarão para entrar</span><input name="password" type="password" minlength="8" required autocomplete="new-password"></label><div class="form-foot"><button class="btn primary" type="submit">Salvar senha da empresa</button></div></form><h4>Adicionar membro pelo e-mail</h4><form id="cloudMemberForm" class="form-grid"><label class="form-field full"><span>E-mail da pessoa (conta já confirmada)</span><input name="email" type="email" required></label><label class="form-field"><span>Acesso</span><select name="role"><option value="member">Membro</option><option value="admin">Administrador</option></select></label><div class="form-foot"><button class="btn" type="submit">Adicionar membro</button></div></form>' : '') + '<div class="form-foot"><button class="btn danger" onclick="cloudSignOut()">Sair da conta</button><button class="btn" onclick="closeModal()">Fechar</button></div>';
   showModal();
+  const passwordForm = document.getElementById('cloudAccessPasswordForm');
+  if (passwordForm) passwordForm.addEventListener('submit', async event => { event.preventDefault(); const password = String(new FormData(passwordForm).get('password') || ''), button = passwordForm.querySelector('[type="submit"]'); button.disabled = true; try { const { error } = await cloudClient.rpc('set_company_access_password', { p_company_id: cloudCtx.id, p_password: password }); if (error) throw error; toast('Senha de acesso da empresa atualizada'); passwordForm.reset(); } catch (error) { toast(cloudError(error)); } finally { button.disabled = false; } });
   const form = document.getElementById('cloudMemberForm');
   if (form) form.addEventListener('submit', async event => { event.preventDefault(); const fields = new FormData(form); const button = form.querySelector('[type="submit"]'); button.disabled = true; try { const { error } = await cloudClient.rpc('add_company_member', { p_company_id: cloudCtx.id, p_email: String(fields.get('email')).trim(), p_role: fields.get('role') }); if (error) throw error; toast('Pessoa adicionada à empresa'); form.reset(); } catch (error) { toast(cloudError(error)); } finally { button.disabled = false; } });
 }
