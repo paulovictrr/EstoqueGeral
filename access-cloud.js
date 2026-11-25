@@ -14,7 +14,8 @@ let cloudRemoteChanged = false;
 let cloudPollTimer = 0;
 
 function cloudGate(html) {
-  document.getElementById('cloudGate').innerHTML = '<section class="cloud-card">' + html + '</section>';
+  const gate = document.getElementById('cloudGate'); gate.hidden = false; document.body.classList.remove('cloud-ready');
+  gate.innerHTML = '<section class="cloud-card">' + html + '</section>';
 }
 function cloudMessage(message, isError = false) {
   const node = document.getElementById('cloudMessage');
@@ -31,6 +32,7 @@ function cloudError(error) {
   if (/DATA_CONFLICT/i.test(message)) return 'Outra pessoa salvou alterações. Atualize a empresa para continuar.';
   return message;
 }
+function cloudRoleLabel(role) { return role === 'owner' || role === 'admin' ? 'Administrador' : 'Membro'; }
 function hasLocalRecords() {
   try {
     const local = JSON.parse(localStorage.getItem(KEY) || '{}');
@@ -62,16 +64,25 @@ function showCloudAuth(mode = 'login', message = '') {
   document.getElementById('cloudAuthToggle').addEventListener('click', () => showCloudAuth(signingUp ? 'login' : 'signup'));
 }
 async function cloudLoadCompanies() {
-  const { data: memberships, error } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
+  const { data: memberships, error } = await cloudClient.from('company_members').select('company_id,role,companies(id,name,active,created_at)').eq('user_id', cloudUser.id);
   if (error) { showCloudAuth('login', cloudError(error)); return; }
-  cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || 'Empresa' }));
+  cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || 'Empresa', active: row.companies?.active !== false, createdAt: row.companies?.created_at || '' }));
   if (cloudCompanies.length) return cloudShowCompanyPicker();
   cloudShowJoinCompany();
 }
 function cloudShowCompanyPicker() {
-  const buttons = cloudCompanies.map(company => '<button class="btn" type="button" data-company="' + esc(company.id) + '">' + esc(company.name) + '<small style="display:block;color:var(--muted)">' + esc(company.role) + '</small></button>').join('');
-  cloudGate('<div class="eyebrow" style="color:var(--green)">ACESSO COMPARTILHADO</div><h1>Escolha a empresa</h1><p>Conta: ' + esc(cloudUser.email) + '</p><div class="cloud-company-list">' + buttons + '</div><p class="cloud-message" id="cloudMessage"></p><div class="form-foot"><button class="btn" type="button" onclick="cloudShowJoinCompany()">Entrar em outra empresa</button><button class="btn" type="button" onclick="cloudShowCreateCompany()">Criar empresa</button></div><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
+  const duplicates = new Map(); cloudCompanies.forEach(company => { const key = company.name.toLocaleLowerCase(); duplicates.set(key, (duplicates.get(key) || 0) + 1); });
+  const cards = cloudCompanies.map(company => {
+    const date = company.createdAt ? new Date(company.createdAt).toLocaleDateString('pt-BR') : '';
+    const disambiguator = duplicates.get(company.name.toLocaleLowerCase()) > 1 ? ' · ref. ' + company.id.slice(-6) : '';
+    const detail = cloudRoleLabel(company.role) + (date ? ' · Criada em ' + date : '') + disambiguator;
+    const pick = company.active ? '<button class="btn cloud-company-pick" type="button" data-company="' + esc(company.id) + '"><span><strong>' + esc(company.name) + '</strong><small>' + esc(detail) + '</small></span><b>Entrar →</b></button>' : '<div class="btn cloud-company-pick cloud-company-disabled"><span><strong>' + esc(company.name) + '</strong><small>' + esc(detail + ' · Desativada') + '</small></span><b>Desativada</b></div>';
+    const manage = ['owner','admin'].includes(company.role) ? '<button class="btn cloud-company-manage" type="button" data-manage-company="' + esc(company.id) + '">Administrar</button>' : '';
+    return '<div class="cloud-company-option">' + pick + manage + '</div>';
+  }).join('');
+  cloudGate('<div class="eyebrow" style="color:var(--green)">ACESSO COMPARTILHADO</div><h1>Escolha a empresa</h1><p>Conta: ' + esc(cloudUser.email) + '</p><div class="cloud-company-list">' + cards + '</div><p class="cloud-message" id="cloudMessage"></p><div class="cloud-picker-actions"><button class="btn" type="button" onclick="cloudShowJoinCompany()">Entrar em outra empresa</button><button class="btn" type="button" onclick="cloudShowCreateCompany()">Criar empresa</button></div><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
   document.querySelectorAll('[data-company]').forEach(button => button.addEventListener('click', () => cloudSelectCompany(button.dataset.company)));
+  document.querySelectorAll('[data-manage-company]').forEach(button => button.addEventListener('click', () => { cloudCtx = cloudCompanies.find(company => company.id === button.dataset.manageCompany); openCloudAccount(); }));
 }
 function cloudShowJoinCompany(message = '') {
   cloudGate('<div class="eyebrow" style="color:var(--green)">ENTRAR EM UMA EMPRESA</div><h1>Nome e senha da empresa</h1><p>Peça esses dados ao responsável pela empresa. Você também precisa estar conectado à sua conta pessoal.</p><form id="cloudJoinForm" class="form-grid"><label class="form-field"><span>Empresa</span><input name="companyName" required minlength="2" autocomplete="organization" placeholder="Nome da empresa"></label><label class="form-field"><span>Senha de acesso da empresa</span><input name="companyPassword" type="password" required minlength="8" autocomplete="off"></label><div class="form-foot"><button class="btn primary" type="submit">Entrar na empresa</button></div></form><p class="cloud-message" id="cloudMessage">' + esc(message) + '</p><div class="form-foot"><button class="btn" type="button" onclick="cloudShowCreateCompany()">Criar uma nova empresa</button>' + (cloudCompanies.length ? '<button class="btn subtle" type="button" onclick="cloudShowCompanyPicker()">Voltar às empresas</button>' : '') + '</div><button class="btn subtle" type="button" onclick="cloudSignOut()">Sair da conta</button>');
@@ -80,9 +91,9 @@ function cloudShowJoinCompany(message = '') {
     try {
       const { data: companyId, error } = await cloudClient.rpc('join_company_by_password', { p_company_name: String(fields.get('companyName')).trim(), p_password: String(fields.get('companyPassword')) });
       if (error) throw error;
-      const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
+      const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name,active,created_at)').eq('user_id', cloudUser.id);
       if (membershipError) throw membershipError;
-      cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || 'Empresa' }));
+      cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || 'Empresa', active: row.companies?.active !== false, createdAt: row.companies?.created_at || '' }));
       if (!cloudCompanies.some(company => company.id === companyId)) throw new Error('Não foi possível confirmar o vínculo. Tente entrar novamente.');
       cloudShowCompanyPicker();
     } catch (error) { cloudMessage(cloudError(error), true); submit.disabled = false; }
@@ -101,9 +112,9 @@ function cloudShowCreateCompany() {
       if (error) throw error;
       const { error: passwordError } = await cloudClient.rpc('set_company_access_password', { p_company_id: companyId, p_password: companyPassword });
       if (passwordError) throw passwordError;
-      const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name)').eq('user_id', cloudUser.id);
+      const { data: memberships, error: membershipError } = await cloudClient.from('company_members').select('company_id,role,companies(id,name,active,created_at)').eq('user_id', cloudUser.id);
       if (membershipError) throw membershipError;
-      cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || name }));
+      cloudCompanies = (memberships || []).map(row => ({ id: row.company_id, role: row.role, name: row.companies?.name || name, active: row.companies?.active !== false, createdAt: row.companies?.created_at || '' }));
       await cloudSelectCompany(companyId);
     } catch (error) { cloudMessage(cloudError(error), true); submit.disabled = false; }
   });
@@ -111,6 +122,7 @@ function cloudShowCreateCompany() {
 async function cloudSelectCompany(companyId) {
   const company = cloudCompanies.find(item => item.id === companyId);
   if (!company) return;
+  if (!company.active) { cloudGate('<h1>Empresa desativada</h1><p>Um administrador precisa reativar esta empresa antes que seus dados possam ser acessados.</p><button class="btn primary" onclick="cloudShowCompanyPicker()">Voltar às empresas</button>'); return; }
   cloudGate('<div class="eyebrow" style="color:var(--green)">CONECTANDO À EMPRESA</div><h1>' + esc(company.name) + '</h1><p>Carregando os dados compartilhados…</p><p class="cloud-message" id="cloudMessage"></p>');
   try {
     const { data: row, error } = await cloudClient.from('company_data').select('payload,revision').eq('company_id', company.id).single();
@@ -184,14 +196,46 @@ async function cloudRefreshCompany() {
   data = row.payload || {}; localStorage.setItem(KEY, JSON.stringify(data)); data = load(); cloudSuppressStorage = false; cloudHideAlert(); render(); toast('Dados atualizados');
 }
 function openCloudAccount() {
+  const openedFromApp = document.body.classList.contains('cloud-ready');
   const choices = cloudCompanies.map(company => '<button class="btn" type="button" onclick="closeModal();cloudSelectCompany(\'' + esc(company.id) + '\')">Abrir ' + esc(company.name) + '</button>').join('');
   const admin = ['owner','admin'].includes(cloudCtx?.role);
-  document.getElementById('modal').innerHTML = '<div class="modal-head"><div><h3>' + esc(cloudCtx?.name || 'Empresa') + '</h3><small>' + esc(cloudUser?.email || '') + ' · perfil ' + esc(cloudCtx?.role || '') + '</small></div><button class="close" onclick="closeModal()">×</button></div><p>Os dados desta empresa são compartilhados entre seus membros.</p>' + (cloudCompanies.length > 1 ? '<div class="cloud-company-list">' + choices + '</div>' : '') + (admin ? '<h4>Senha de acesso da empresa</h4><form id="cloudAccessPasswordForm" class="form-grid"><label class="form-field full"><span>Defina ou troque a senha que os membros usarão para entrar</span><input name="password" type="password" minlength="8" required autocomplete="new-password"></label><div class="form-foot"><button class="btn primary" type="submit">Salvar senha da empresa</button></div></form><h4>Adicionar membro pelo e-mail</h4><form id="cloudMemberForm" class="form-grid"><label class="form-field full"><span>E-mail da pessoa (conta já confirmada)</span><input name="email" type="email" required></label><label class="form-field"><span>Acesso</span><select name="role"><option value="member">Membro</option><option value="admin">Administrador</option></select></label><div class="form-foot"><button class="btn" type="submit">Adicionar membro</button></div></form>' : '') + '<div class="form-foot"><button class="btn danger" onclick="cloudSignOut()">Sair da conta</button><button class="btn" onclick="closeModal()">Fechar</button></div>';
+  const companyIdSuffix = cloudCtx?.id ? cloudCtx.id.slice(-6) : '';
+  const adminTools = admin ? '<h4>Dados da empresa</h4><form id="cloudCompanyNameForm" class="form-grid"><label class="form-field full"><span>Nome</span><input name="name" required minlength="2" maxlength="120" value="' + esc(cloudCtx?.name || '') + '"></label><div class="form-foot"><button class="btn primary" type="submit">Salvar nome</button></div></form><p class="cloud-message">Identificador: …' + esc(companyIdSuffix) + (cloudCtx?.createdAt ? ' · Criada em ' + esc(new Date(cloudCtx.createdAt).toLocaleDateString('pt-BR')) : '') + '</p><div class="form-foot"><button class="btn" type="button" onclick="cloudToggleCompanyActive()">' + (cloudCtx?.active === false ? 'Reativar empresa' : 'Desativar empresa') + '</button></div><h4>Senha de acesso da empresa</h4><form id="cloudAccessPasswordForm" class="form-grid"><label class="form-field full"><span>Defina ou troque a senha que os membros usarão para entrar</span><input name="password" type="password" minlength="8" required autocomplete="new-password"></label><div class="form-foot"><button class="btn primary" type="submit">Salvar senha da empresa</button></div></form><h4>Adicionar membro pelo e-mail</h4><form id="cloudMemberForm" class="form-grid"><label class="form-field full"><span>E-mail da pessoa (conta já confirmada)</span><input name="email" type="email" required></label><label class="form-field"><span>Acesso</span><select name="role"><option value="member">Membro</option><option value="admin">Administrador</option></select></label><div class="form-foot"><button class="btn" type="submit">Adicionar membro</button></div></form><div class="cloud-danger-zone"><strong>Excluir esta empresa</strong><p>Isso apaga permanentemente os produtos, fornecedores, faturamentos e demais dados compartilhados desta empresa.</p><button class="btn danger" type="button" onclick="cloudDeleteCompany()">Excluir empresa…</button></div>' : '';
+  document.getElementById('modal').innerHTML = '<div class="modal-head"><div><h3>' + esc(cloudCtx?.name || 'Empresa') + (cloudCtx?.active === false ? ' · Desativada' : '') + '</h3><small>' + esc(cloudUser?.email || '') + ' · ' + esc(cloudRoleLabel(cloudCtx?.role)) + '</small></div><button class="close" onclick="closeModal()">×</button></div><p>Os dados desta empresa são compartilhados entre seus membros.</p>' + (cloudCompanies.length > 1 ? '<div class="cloud-company-list">' + choices + '</div>' : '') + adminTools + '<div class="form-foot"><button class="btn danger" onclick="cloudSignOut()">Sair da conta</button><button class="btn" onclick="closeModal()">Fechar</button></div>';
   showModal();
+  const nameForm = document.getElementById('cloudCompanyNameForm');
+  if (nameForm) nameForm.addEventListener('submit', async event => { event.preventDefault(); const name = String(new FormData(nameForm).get('name') || '').trim(), button = nameForm.querySelector('[type="submit"]'); button.disabled = true; try { const { error } = await cloudClient.rpc('set_company_name', { p_company_id: cloudCtx.id, p_name: name }); if (error) throw error; cloudCtx.name = name; cloudCompanies = cloudCompanies.map(company => company.id === cloudCtx.id ? { ...company, name } : company); const label = document.getElementById('cloudCompanyLabel'); if (label) label.textContent = name + ' · ' + cloudUser.email; const accountButton = document.getElementById('cloudAccountButton'); if (accountButton) accountButton.textContent = name; toast('Nome da empresa atualizado'); const title = document.querySelector('#modal .modal-head h3'); if (title) title.textContent = name; if (!openedFromApp) { closeModal(); cloudShowCompanyPicker(); } } catch (error) { toast(cloudError(error)); } finally { button.disabled = false; } });
   const passwordForm = document.getElementById('cloudAccessPasswordForm');
   if (passwordForm) passwordForm.addEventListener('submit', async event => { event.preventDefault(); const password = String(new FormData(passwordForm).get('password') || ''), button = passwordForm.querySelector('[type="submit"]'); button.disabled = true; try { const { error } = await cloudClient.rpc('set_company_access_password', { p_company_id: cloudCtx.id, p_password: password }); if (error) throw error; toast('Senha de acesso da empresa atualizada'); passwordForm.reset(); } catch (error) { toast(cloudError(error)); } finally { button.disabled = false; } });
   const form = document.getElementById('cloudMemberForm');
   if (form) form.addEventListener('submit', async event => { event.preventDefault(); const fields = new FormData(form); const button = form.querySelector('[type="submit"]'); button.disabled = true; try { const { error } = await cloudClient.rpc('add_company_member', { p_company_id: cloudCtx.id, p_email: String(fields.get('email')).trim(), p_role: fields.get('role') }); if (error) throw error; toast('Pessoa adicionada à empresa'); form.reset(); } catch (error) { toast(cloudError(error)); } finally { button.disabled = false; } });
+}
+async function cloudToggleCompanyActive() {
+  if (!cloudCtx || !['owner','admin'].includes(cloudCtx.role)) return;
+  const nextActive = cloudCtx.active === false;
+  try {
+    const { error } = await cloudClient.rpc('set_company_active', { p_company_id: cloudCtx.id, p_active: nextActive }); if (error) throw error;
+    cloudCompanies = cloudCompanies.map(company => company.id === cloudCtx.id ? { ...company, active: nextActive } : company);
+    if (nextActive) { cloudCtx.active = true; toast('Empresa reativada'); closeModal(); cloudLeaveCompany(); }
+    else { toast('Empresa desativada'); closeModal(); cloudLeaveCompany(); }
+  } catch (error) { toast(cloudError(error)); }
+}
+async function cloudDeleteCompany() {
+  if (!cloudCtx || !['owner','admin'].includes(cloudCtx.role)) return;
+  const company = cloudCtx, confirmName = prompt('Para confirmar a exclusão permanente da empresa “' + company.name + '” (identificador final …' + company.id.slice(-6) + '), digite exatamente o nome:');
+  if (confirmName !== company.name) { if (confirmName !== null) toast('O nome não corresponde; a empresa não foi excluída'); return; }
+  if (!confirm('Excluir “' + company.name + '” e todos os dados dela permanentemente?')) return;
+  try {
+    const { error } = await cloudClient.rpc('delete_company', { p_company_id: company.id }); if (error) throw error;
+    cloudCompanies = cloudCompanies.filter(item => item.id !== company.id); cloudCtx = null; closeModal();
+    cloudLeaveCompany(); toast('Empresa e dados excluídos');
+  } catch (error) { toast(cloudError(error)); }
+}
+async function cloudLeaveCompany(clearLocal = true) {
+  clearInterval(cloudPollTimer); cloudCtx = null; cloudQueuedSnapshot = null; cloudRemoteChanged = false; cloudSuppressStorage = true;
+  if (clearLocal) try { localStorage.removeItem(KEY); } catch {}
+  cloudSuppressStorage = false; document.body.classList.remove('cloud-ready');
+  data = load(); await cloudLoadCompanies();
 }
 async function cloudSignOut() {
   clearInterval(cloudPollTimer); cloudCtx = null; cloudCompanies = []; cloudUser = null; cloudQueuedSnapshot = null; cloudRemoteChanged = false; cloudSuppressStorage = true;
