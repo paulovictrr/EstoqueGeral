@@ -1,26 +1,27 @@
-# Estoque Geral
+# Estoque Geral — GitHub Pages
 
-Sistema web simples para organizar estoque, almoxarifado, fornecedores e movimentações.
+Arquivos do site com acesso por conta e sincronização Supabase:
 
-## Funcionalidades
+- `index.html`
+- `access-cloud.js`
+- `icone-estoque.png`
+- `.nojekyll`
 
-- Produtos e lotes com fornecedor, quantidade, preço, validade e classificação.
-- Lotes com saldo podem ser mesclados quando produto, classificação, unidade, peso, fornecedor, preço e vencimento coincidirem. O saldo é somado ao lote escolhido, e o lote de origem é arquivado com o histórico preservado.
-- Lotes sem saldo podem ser arquivados e restaurados. Os filtros de Estoque e Almoxarifado permitem visualizar ativos, arquivados ou todos.
-- Entradas somam a quantidade do lote quando fornecedor, preço e vencimento coincidem; diferenças criam outro lote. Saídas para produção descontam do lote escolhido e atualizam o saldo.
-- Filtros por área, fornecedor, departamento, seção e categoria.
-- Relatórios exportáveis em Excel (`.xlsx`) e PDF.
-- Backup e restauração de produtos, fornecedores e movimentações em CSV; o backup de produtos também preserva o status de arquivamento.
-- Interface adaptada para celular, com abas principais e menu **Mais**. A aba **Sobre** reúne aviso de direitos autorais, termos de uso e política de privacidade.
+Envie todos esses arquivos para a raiz do repositório `EstoqueGeral` no GitHub. O `access-cloud.js` precisa ficar ao lado do `index.html`.
 
-## Backups e relatórios
+## Antes do primeiro acesso
 
-- **Backup CSV** baixa arquivos de produtos, fornecedores e movimentações, com UTF-8 e separador adequado ao Excel em português. Selecione esses CSVs juntos em **Importar CSV** para restaurar.
-- Na aba **Relatórios**, filtre por área, departamento, seção, categoria e fornecedor, e escolha **Excel (.xlsx)** ou **PDF**. Na aba **Fornecedores**, gere relatórios PDF/Excel com os filtros de fornecedores aplicados.
-- O PDF abre a tela de impressão do navegador; escolha **Salvar como PDF**.
-- A exportação Excel carrega a biblioteca xlsx-js-style da internet para aplicar a formatação visual. Os demais recursos continuam disponíveis mesmo se essa biblioteca não carregar.
+Antes de enviar esta versão, execute os arquivos SQL separados no **SQL Editor** do mesmo projeto Supabase, nesta ordem: `supabase-acesso-empresa.sql` (se ainda não executou) e `supabase-administracao-empresa.sql`. Eles habilitam o acesso por senha e a administração de empresas. Não envie os arquivos SQL ao GitHub.
 
-## Onde ficam os dados
+No Supabase, em **Authentication → URL Configuration**, use:
 
-Os dados ficam no armazenamento local do navegador e aparelho usados. O GitHub Pages hospeda o sistema, mas não sincroniza os cadastros entre aparelhos. Para transferir dados, exporte os CSVs no aparelho atual e importe-os no outro. Limpar os dados do navegador pode apagar os cadastros locais.
+- Site URL: `https://paulovictrr.github.io/EstoqueGeral/`
+- Redirect URL: `https://paulovictrr.github.io/EstoqueGeral/**`
 
+Na primeira abertura, crie uma conta com primeiro nome, segundo nome, e-mail e senha; confirme o e-mail e entre. A primeira conta pode criar a empresa **Shalon**. Se houver dados no navegador onde a conta foi criada, o sistema pergunta se deseja importá-los. Pessoas da equipe criam e confirmam suas próprias contas e podem escolher uma empresa existente na tela seguinte. A tela de login também inclui recuperação de senha por e-mail.
+
+Administradores podem editar o nome da empresa, desativá-la, reativá-la ou excluí-la. Antes de excluir, o sistema oferece baixar um backup completo em JSON ou continuar sem backup; a exclusão pede confirmação digitada e apaga permanentemente os dados daquela empresa. Os arquivos CSV são exportações de tabelas (produtos, fornecedores e movimentações) para consulta e planilhas; não são backups completos e a importação CSV apenas acrescenta registros, ignorando duplicados. Use o arquivo **backup completo `.json`** para recuperação integral: em Administração, baixe o JSON e use “Restaurar backup completo” na mesma empresa. A restauração substitui os dados atuais e exige confirmar digitando o nome da empresa; usuários, membros e senha de acesso são mantidos. Se a empresa foi excluída, crie-a novamente a partir do JSON, defina uma nova senha e adicione os membros outra vez. Guarde o JSON com cuidado porque pode conter dados pessoais e comerciais. O administrador define a senha de acesso da empresa no botão com o nome dela. Uma nova pessoa entra com seu próprio e-mail e senha, escolhe **Entrar em outra empresa** e informa o nome e a senha compartilhada recebida do administrador. Também é possível adicioná-la diretamente por e-mail, sem usar a senha compartilhada.
+
+A aba **Notificações** reúne novos produtos cadastrados e entradas, saídas e ajustes de estoque, em ordem do mais recente para o mais antigo. Na saída, escolha um destino sugerido ou selecione **Outro** para informar um destino diferente.
+
+As alterações são sincronizadas para a empresa. Se alguém atualizar os dados ao mesmo tempo, o sistema avisa e permite carregar a versão mais recente.
